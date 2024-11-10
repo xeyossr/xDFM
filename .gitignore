@@ -1,0 +1,6 @@
+.vscode
+build
+myenv
+xdfm.spec
+xdfm.code-workspace
+__pycache__

@@ -1,0 +1,6 @@
+pyinstaller 
+argcomplete 
+click 
+colorama 
+GitPython 
+PyGithub
