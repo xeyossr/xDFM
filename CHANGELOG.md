@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2024-11-13
+
+### Added
+
+- Added `editconfig` command to edit the config file with the specified editor (default is nano).
+
+### Changed
+
+- Updated the `create` command to copy to folder within folder.
+- Removed unused modules
+
 ## [1.1.0] - 2024-11-12
 
 ### Added
