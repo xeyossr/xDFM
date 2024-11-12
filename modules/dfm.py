@@ -146,6 +146,7 @@ def create_dotfiles(config_file, path, name):
     if os.path.exists(target_dir):
         print(f"{colorama.Fore.RED}Error: dotfiles folder already exists in {path}")
         return
+        
     os.makedirs(target_dir)
 
     for key, folder in dots_folders:
@@ -179,7 +180,6 @@ def create_dotfiles(config_file, path, name):
                     print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
         
         elif os.path.isfile(folder):  # Dosya ise
-            # Eğer key bir uzantıya sahip değilse, key adıyla bir klasör oluştur
             if '/' in key:
                 parent_folder, file_name = key.split('/', 1)
                 target_folder = os.path.join(target_dir, parent_folder)
@@ -242,29 +242,89 @@ def update_dotfiles(config_file, path):
     target_dir = os.path.expanduser(path)
 
     if not os.path.exists(target_dir):
-        print(f"{colorama.Fore.YELLOW}Creating new dotfiles directory at {target_dir}.")
-        os.makedirs(target_dir)
+        print(f"{colorama.Fore.RED}{target_dir} does not exist.")
+        return
 
     print(f"{colorama.Fore.CYAN}Updating dotfiles, please wait...")
 
     for key, folder in dots_folders:
-        target_folder = os.path.join(target_dir, os.path.basename(folder))
+        if os.path.isdir(folder):  # Klasör ise
+            target_folder = os.path.join(target_dir, os.path.basename(folder))
 
-        if os.path.isdir(folder):  
-            if not os.path.exists(target_folder):  
-                shutil.copytree(folder, target_folder)
-                print(f"{colorama.Fore.YELLOW}Copied folder: {folder}")
+            if '/' in key:
+                parent_folder, file_name = key.split('/', 1)
+                target_folder = os.path.join(target_dir, parent_folder)
+
+                if not os.path.exists(target_folder):
+                    os.makedirs(target_folder, exist_ok=True)
+
+                target_path = os.path.join(target_folder, file_name)
+                if os.path.exists(target_path):
+                    shutil.rmtree(target_path)  # Eski klasörü sil
+
+                try:
+                    shutil.copytree(folder, target_path)
+                    print(f"{colorama.Fore.YELLOW}Copied folder {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_path}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
             else:
-                update_folder(folder, target_folder)
+                if os.path.exists(target_folder):
+                    shutil.rmtree(target_folder)  # Eski klasörü sil
+
+                try:
+                    shutil.copytree(folder, target_folder)
+                    print(f"{colorama.Fore.YELLOW}Copied folder {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_folder}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+            
         elif os.path.isfile(folder):
-            if not os.path.exists(target_folder) or not filecmp.cmp(folder, target_folder, shallow=False):
-                shutil.copy(folder, target_folder)
-                print(f"{colorama.Fore.YELLOW}Copied file: {folder}")
+            if '/' in key:
+                parent_folder, file_name = key.split('/', 1)
+                target_folder = os.path.join(target_dir, parent_folder)
+        
+                if not os.path.exists(target_folder):
+                   os.makedirs(target_folder, exist_ok=True)
+        
+                target_path = os.path.join(target_folder, file_name)
+                if os.path.exists(target_path):
+                    if os.path.isdir(target_path):
+                     shutil.rmtree(target_path)  # Var olan klasörü sil
+                    else:
+                     os.remove(target_path)  # Var olan dosyayı sil
+        
+                try:
+                   shutil.copy(folder, target_path)
+                   print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_path}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+         
+            else:
+                target_path = os.path.join(target_dir, os.path.basename(folder))
+                if os.path.exists(target_path):
+                    if os.path.isdir(target_path):
+                        shutil.rmtree(target_path)  # Var olan klasörü sil
+                else:
+                    os.remove(target_path)  # Var olan dosyayı sil
+            
+                try:
+                    shutil.copy(folder, target_path)
+                    print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_path}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+         
+                try:
+                    shutil.copy(folder, target_path)
+                    print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_path}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+
+        else:
+            print(f"{colorama.Fore.RED}Error: Item {folder} does not exist.{colorama.Fore.RESET}")
     
     print(f"\r{colorama.Fore.GREEN}Updated.{colorama.Style.RESET_ALL}")
 
+
 def update_folder(source_folder, target_folder):
-    """Güncel olmayan dosyaları veya eksik dosyaları hedef klasöre kopyalar."""
     updated_files = False 
 
     for root, dirs, files in os.walk(source_folder):
