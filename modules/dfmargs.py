@@ -1,25 +1,18 @@
-import argparse
-import argcomplete 
 import os
-import sys
 import click
-import configparser
-import shutil
+import sys
 import colorama
-from git import Repo
-from github import Github
-from modules import dfm
 from pathlib import Path
-
+from modules import dfm
 colorama.init()
 
 global home_dir, dot_config_dir, config_dir, config_file
 
-home_dir = Path(os.path.expanduser('~'))
-dot_config_dir = Path(os.path.join(home_dir, '.config'))
-config_dir = Path(os.path.join(dot_config_dir, 'xdfm'))
-config_file = Path(os.path.join(config_dir, 'xdfm.conf'))
+home_dir = dfm.home_dir
 main = home_dir
+dot_config_dir = dfm.dot_config_dir
+config_dir = dfm.config_dir
+config_file = Path(os.path.join(config_dir, 'xdfm.conf'))
 
 class OrderedGroup(click.Group):
     def list_commands(self, ctx):
@@ -27,7 +20,7 @@ class OrderedGroup(click.Group):
 
 # Main command
 @click.group(cls=OrderedGroup)
-@click.version_option(version="1.1.0")
+@click.version_option(version=dfm.__version__)
 def xdfm():
     """xdfm - Xeyossr Dotfiles Manager."""
     pass
@@ -47,23 +40,6 @@ def github():
 def create(repo_name, commit, path):
     """Create GitHub `dotfiles` repository."""
     dfm.create_repo(repo_name, config_file, path, commit)
-
-
-
-#@github.command()
-#@click.argument('repo_name')
-#@click.option('--commit', default="Update", help="Commit message")
-#def push(repo_name, commit):
-#    """Push changes to a GitHub repository."""
-#    click.echo(f"{colorama.Fore.YELLOW}Pushing to `{colorama.Fore.GREEN}{repo_name}{colorama.Fore.YELLOW}` with message: `{colorama.Fore.CYAN}{commit}{colorama.Fore.YELLOW}`")
-#    dfm.push(repo_name, commit)
-
-# GitHub delete command
-#@github.command()
-#@click.argument('repo_url')
-#def delete(repo_url):
-#    """Delete a GitHub repository."""
-#    click.echo(f"Deleting repo at {repo_url}")
 
 
 @github.command()
@@ -107,6 +83,13 @@ def edit(key, value):
     click.echo(f"{colorama.Fore.YELLOW}Editing `{colorama.Fore.GREEN}{key}{colorama.Fore.YELLOW}` to `{colorama.Fore.GREEN}{value}{colorama.Fore.YELLOW}`")
     dfm.edit_config(config_file, 'Dots', key, value)
 
+
+@xdfm.command()
+@click.argument('editor', required=False, default='nano')
+def editconfig(editor):
+    """Edit the config file with the specified editor (default: nano)"""
+    dfm.edit_configfile(config_file, editor)
+
 # Create dotfiles directory
 @xdfm.command()
 @click.option('--path', default=main, help='Dotfiles folder path')
@@ -128,6 +111,7 @@ def info():
     """Some important information."""
     click.echo("Some information")
     click.echo("\n- When adding a file with 'add', if the key is not equal to the name of the file and there is no space or extension in the key, it will create a folder with that name and put the file there.")
+    click.echo("\n- When adding a folder/file with the 'add' command, if you set the key to something like '.config/waybar', it will create a folder named .config and copy that file/folder into it.")
 
 
 # Add the github commands to the main xdfm command

@@ -1,13 +1,13 @@
-import argparse
-import argcomplete 
 import os
-import sys
 import click
 import configparser
-import time
+import subprocess
 import shutil
 import colorama
+import requests
 import filecmp
+import time
+import sys
 from git import Repo
 from git.exc import GitCommandError
 from github import Github
@@ -18,7 +18,36 @@ home_dir = Path(os.path.expanduser('~'))
 dot_config_dir = Path(os.path.join(home_dir, '.config'))
 config_dir = Path(os.path.join(dot_config_dir, 'xdfm'))
 
+__version__ = '1.2.0'
+
+isuptodate_link = 'https://raw.githubusercontent.com/xeyossr/xDFM/refs/heads/main/modules/version.ver'
+
 colorama.init()
+
+
+#def update():
+#    try:
+#        response = requests.get(isuptodate_link)
+#        response.raise_for_status()
+#        isuptodate = response.text
+#        update_config = configparser.ConfigParser()
+#        update_config.read_string(isuptodate)
+
+#    except Exception as e:
+#        print(f'{colorama.Fore.RED} Error: {e}')
+#        sys.exit(1)
+
+#    print(f"{colorama.Fore.YELLOW}Checking for updates...")
+#    if __version__ != update_config['Version']['version']:
+#        print(f'{colorama.Fore.BLUE}A new release of xDFM is available: {colorama.Fore.RED}{__version__}{colorama.Fore.BLUE} -> {colorama.Fore.GREEN}{update_config['Version']['version']}{colorama.Fore.RESET}')
+#        time.sleep(1)
+#        print(f"{colorama.Fore.GREEN}Updating...{colorama.Fore.RESET}")
+#        os.system(update_config['Update']['command'])
+#        print(f'{colorama.Fore.CYAN}xDFM updated to {colorama.Fore.RED}{update_config['Version']['version']}{colorama.Fore.RESET}')
+    
+#    else:
+#        print(f'{colorama.Fore.CYAN}xDFM is Up to date{colorama.Fore.RESET}')
+
 
 def read_config(configfile):
     global config, dots, pat_token
@@ -27,7 +56,7 @@ def read_config(configfile):
 
     if not configfile.exists():
         with open(configfile, 'w') as cf:
-            cf.write("[Dots]\n\n[GitHub]\npat=undefined\n\n[Settings]\nPAT_Alert=enabled")
+            cf.write("[Dots]\n\n[GitHub]\npat=undefined\n\n[Settings]\nAutoUpdate=enabled")
 
 
     config = configparser.ConfigParser()
@@ -47,23 +76,14 @@ def save_config(configfile):
     with open(configfile, 'w') as cf:
         config.write(cf)
 
-def patalert(configfile):
-    read_config(configfile)
-    if config['Settings']['PAT_Alert'] == "enabled":
-        print(f"{colorama.Fore.RED}Error: GitHub Personal Access Token (PAT) isn't set in the config file! Please set the PAT using the `{colorama.Fore.GREEN}xdfm github pat YOUR_PAT{colorama.Fore.RED}` command")
-        sys.exit(1)
-
 def add_config(config_file, setting, value, key=None):
-    # Eğer key verilmemişse, value'nin son klasör adını al
     if key is None:
         key = os.path.basename(os.path.normpath(value))
         
-    # Eğer key zaten varsa hata mesajı ver ve fonksiyonu sonlandır
     if key in config[setting]:
         print(f"{colorama.Fore.RED}Error: `{key}` already exists in the config file: '{key}={config[setting][key]}'")
         return
     
-    # Yeni key-value çifti ekle ve config'i kaydet
     config[setting][key] = value
     save_config(config_file)
 
@@ -89,16 +109,14 @@ def remove_config(config_file, setting, key):
     read_config(config_file)
 
     if config.has_option(setting, key):
-        # Eğer key'i bulduysak, onu sil
         config.remove_option(setting, key)
         print(f"{colorama.Fore.YELLOW}Removed {key} from {setting} section.")
         save_config(config_file)
     else:
-        # Eğer key'i bulamazsak, value kontrolü yapalım
         found = False
         for section_key in config[setting]:
             folder_path = config[setting][section_key]
-            expanded_folder = os.path.expanduser(folder_path)  # Ev dizini (~) çözülür
+            expanded_folder = os.path.expanduser(folder_path) 
             if folder_path == key:
                 config.remove_option(setting, section_key)
                 save_config(config_file)
@@ -107,7 +125,6 @@ def remove_config(config_file, setting, key):
                 break
 
         if not found:
-            # Eğer hiçbir şey bulamazsak, kırmızı renkte hata mesajı
             print(f"{colorama.Fore.RED}{key} not found in {setting} section or no matching folder path found.")
 
 
@@ -122,36 +139,88 @@ def create_dotfiles(config_file, path, name):
     dots_folders = []
     for key in config['Dots']:
         folder = config['Dots'][key]
-        expanded_folder = os.path.expanduser(folder)  # Ev dizini (~) çözülür
-        dots_folders.append((key, expanded_folder))  # key'i de ekliyoruz
+        expanded_folder = os.path.expanduser(folder)  
+        dots_folders.append((key, expanded_folder)) 
 
-    # Hedef dizinde yeni bir klasör oluştur
     target_dir = os.path.join(os.path.expanduser(path), name)
     if os.path.exists(target_dir):
         print(f"{colorama.Fore.RED}Error: dotfiles folder already exists in {path}")
         return
     os.makedirs(target_dir)
 
-    # Her bir klasörü ya da dosyayı kopyala
     for key, folder in dots_folders:
-        if os.path.isdir(folder):  # Klasörse
+        if os.path.isdir(folder):
+
             target_folder = os.path.join(target_dir, os.path.basename(folder))
-            try:
-                shutil.copytree(folder, target_folder)
-                print(f"{colorama.Fore.YELLOW}Copied folder {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_folder}{colorama.Fore.YELLOW}")
-            except Exception as e:
-                print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+            
+            if '/' in key:
+                parent_folder, file_name = key.split('/', 1)
+                target_folder = os.path.join(target_dir, parent_folder)
+
+                if not os.path.exists(target_folder):
+                    try:
+                        os.makedirs(target_folder)
+                    except Exception as e:
+                        print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+
+                try:
+                    shutil.copytree(folder, os.path.join(target_folder, file_name))
+                    print(f"{colorama.Fore.YELLOW}Copied folder {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{os.path.join(target_folder, file_name)}{colorama.Fore.YELLOW}")
+
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+
+            else:        
+                try:
+                    shutil.copytree(folder, target_folder)
+                    print(f"{colorama.Fore.YELLOW}Copied folder {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_folder}{colorama.Fore.YELLOW}")
+
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+        
         elif os.path.isfile(folder):  # Dosya ise
             # Eğer key bir uzantıya sahip değilse, key adıyla bir klasör oluştur
-            if not os.path.splitext(key)[1] and ' ' not in key:  # Key uzantı içermiyorsa ve boşluk yoksa
-                target_folder = os.path.join(target_dir, key)  # Yeni klasör adı olarak key kullanılıyor
+            if '/' in key:
+                parent_folder, file_name = key.split('/', 1)
+                target_folder = os.path.join(target_dir, parent_folder)
+
                 if not os.path.exists(target_folder):
-                    os.makedirs(target_folder)
-                shutil.copy(folder, target_folder)  # Dosyayı key adıyla oluşturulan klasöre kopyala
-                print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_folder}{colorama.Fore.YELLOW}")
+                    try:
+                        os.makedirs(target_folder)
+                    except Exception as e:
+                        print(f"{colorama.Fore.RED}Error copying folder {folder}: {e}")
+
+                try:    
+                    shutil.copy(folder, os.path.join(target_folder, file_name))  
+                    print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{os.path.join(target_folder, file_name)}{colorama.Fore.YELLOW}")
+
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+
+            
+            elif not os.path.splitext(key)[1] and ' ' not in key: 
+                target_folder = os.path.join(target_dir, key)  
+            
+                if not os.path.exists(target_folder):
+                    try:
+                        os.makedirs(target_folder)
+                    except Exception as e:
+                        print(f"{colorama.Fore.RED}Error creating folder {target_folder}: {e}")
+                
+                try:
+                    shutil.copy(folder, target_folder) 
+                    print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_folder}{colorama.Fore.YELLOW}")
+            
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+
             else:
-                shutil.copy(folder, target_dir)  # Dosyayı doğrudan target_dir'e kopyala
-                print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_dir}{colorama.Fore.YELLOW}")
+                try:
+                    shutil.copy(folder, target_dir) 
+                    print(f"{colorama.Fore.YELLOW}Copied file {colorama.Fore.CYAN}{folder}{colorama.Fore.YELLOW} to => {colorama.Fore.GREEN}{target_dir}{colorama.Fore.YELLOW}")
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}Error copying file {folder}: {e}")
+
         else:
             print(f"{colorama.Fore.RED}Error: Item {folder} does not exist.{colorama.Fore.RESET}")
 
@@ -167,51 +236,46 @@ def update_dotfiles(config_file, path):
     dots_folders = []
     for key in config['Dots']:
         folder = config['Dots'][key]
-        expanded_folder = os.path.expanduser(folder)  # Ev dizini (~) çözülür
-        dots_folders.append((key, expanded_folder))  # key ve folderi birlikte tutuyoruz
+        expanded_folder = os.path.expanduser(folder)  
+        dots_folders.append((key, expanded_folder))  
 
     target_dir = os.path.expanduser(path)
 
-    # Eğer hedef dizin yoksa oluştur
     if not os.path.exists(target_dir):
         print(f"{colorama.Fore.YELLOW}Creating new dotfiles directory at {target_dir}.")
         os.makedirs(target_dir)
 
-    # Başlangıçta işlemlerin yapılacağı bilgisini gösteriyoruz
     print(f"{colorama.Fore.CYAN}Updating dotfiles, please wait...")
 
-    # Klasörleri ve dosyaları karşılaştır ve güncelle
     for key, folder in dots_folders:
         target_folder = os.path.join(target_dir, os.path.basename(folder))
 
-        if os.path.isdir(folder):  # Eğer kaynak bir klasörse
-            if not os.path.exists(target_folder):  # Eğer hedef klasör yoksa
+        if os.path.isdir(folder):  
+            if not os.path.exists(target_folder):  
                 shutil.copytree(folder, target_folder)
                 print(f"{colorama.Fore.YELLOW}Copied folder: {folder}")
             else:
                 update_folder(folder, target_folder)
-        elif os.path.isfile(folder):  # Eğer kaynak bir dosyaysa
+        elif os.path.isfile(folder):
             if not os.path.exists(target_folder) or not filecmp.cmp(folder, target_folder, shallow=False):
                 shutil.copy(folder, target_folder)
                 print(f"{colorama.Fore.YELLOW}Copied file: {folder}")
     
-    # İşlem bitince "Updated" mesajı
     print(f"\r{colorama.Fore.GREEN}Updated.{colorama.Style.RESET_ALL}")
 
 def update_folder(source_folder, target_folder):
     """Güncel olmayan dosyaları veya eksik dosyaları hedef klasöre kopyalar."""
-    updated_files = False  # Dosyaların güncellenip güncellenmediğini takip etmek için bir bayrak
+    updated_files = False 
 
     for root, dirs, files in os.walk(source_folder):
         for file in files:
             source_file = os.path.join(root, file)
             target_file = os.path.join(target_folder, os.path.relpath(source_file, source_folder))
             
-            # Eğer hedef dosya yoksa veya güncel değilse
             if not os.path.exists(target_file) or not filecmp.cmp(source_file, target_file, shallow=False):
-                os.makedirs(os.path.dirname(target_file), exist_ok=True)  # Dosya için hedef klasörü oluştur
-                shutil.copy(source_file, target_file)  # Dosyayı kopyala
-                updated_files = True  # Dosya güncellendi
+                os.makedirs(os.path.dirname(target_file), exist_ok=True) 
+                shutil.copy(source_file, target_file)  
+                updated_files = True 
 
     if updated_files:
         print(f"{colorama.Fore.YELLOW}Folder updated: {source_folder}")
@@ -219,30 +283,24 @@ def update_folder(source_folder, target_folder):
 
 def add_remote_if_not_exists(repo, remote_name, remote_url):
     try:
-        # Mevcut uzak bağlantıları kontrol et
         remotes = [remote.name for remote in repo.remotes]
         if remote_name not in remotes:
-            # Eğer 'origin' yoksa, ekle
             repo.create_remote(remote_name, remote_url)
     except GitCommandError as e:
         print(f"Error adding remote: {e}")
 
 def create_repo(repo_name, config_file, path, commit):
     try:
-        # Yerel repo dizini kontrol ediliyor
         local_repo_path = Path(os.path.join(home_dir, 'dotfiles'))
         if not local_repo_path.exists():
             print(f"{colorama.Fore.RED}ERROR: dotfiles does not exist. Please create it using the {colorama.Fore.GREEN}`xdfm create`{colorama.Fore.RED} command")
             return
         
-        # Yerel repo başlatılıyor
         local_repo = Repo.init(local_repo_path)
 
-        # GitHub bağlantısı kuruluyor
         g = Github(pat_token)
         user = g.get_user()
         
-        # Repo var mı kontrol et
         try:
             repo = user.get_repo(repo_name)
             print(f"{colorama.Fore.YELLOW}Repository '{repo_name}' already exists on GitHub.")
@@ -252,26 +310,23 @@ def create_repo(repo_name, config_file, path, commit):
             repo = user.create_repo(repo_name, private=True)
             repo_url = repo.clone_url
         
-        # Origin remote bağlantısını ekleyelim (varsa eklemeyelim)
         try:
             add_remote_if_not_exists(local_repo, 'origin', repo_url)
         except Exception as e:
             print(f"{colorama.Fore.RED}ERROR: Failed to add remote repository. Details: {str(e)}")
             return
 
-        # Değişiklikleri ekleyip commit yapalım
         try:
             print(f"{colorama.Fore.YELLOW}Adding and committing changes...")
-            local_repo.index.add('*')  # Tüm dosyaları ekleyelim
-            local_repo.index.commit(commit)  # Commit işlemi yapalım
+            local_repo.index.add('*')  
+            local_repo.index.commit(commit) 
         except Exception as e:
             print(f"{colorama.Fore.RED}ERROR: Failed to commit changes. Details: {str(e)}")
             return
 
-        # Değişiklikleri GitHub'a push edelim
         try:
             print(f"{colorama.Fore.YELLOW}Pushing changes to GitHub...")
-            local_repo.remotes.origin.push('main')  # main branch'ini push edelim
+            local_repo.remotes.origin.push('main') 
         except Exception as e:
             print(f"{colorama.Fore.RED}ERROR: Failed to push changes to GitHub. Details: {str(e)}")
             return
@@ -281,3 +336,9 @@ def create_repo(repo_name, config_file, path, commit):
 
     except Exception as e:
         print(f"{colorama.Fore.RED}ERROR: An unexpected error occurred. Details: {str(e)}")
+
+def edit_configfile(config_file, editor):
+    try:
+        subprocess.run([editor, config_file])
+    except Exception as e:
+        print(f"{colorama.Fore.RED}ERROR: Failed to open the config file with {editor}. Details: {str(e)}")
