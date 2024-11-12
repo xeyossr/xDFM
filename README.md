@@ -50,15 +50,18 @@ Usage: xdfm.py [OPTIONS] COMMAND [ARGS]...
   xdfm - Xeyossr Dotfiles Manager.
 
 Options:
-  --help  Show this message and exit.
+  --version  Show the version and exit.
+  --help     Show this message and exit.
 
 Commands:
-  add       Add a new dot folder path to the config.
-  remove    Remove an existing dot folder path from the config.
-  edit      Edit the path of an existing dot folder.
-  create    Create dotfiles directory
-  recreate  Recreate the dotfiles directory
-  github    Commands related to GitHub operations
+  add     Add a new dot folder path to the config file.
+  remove  Remove an existing dot folder path from the config file.
+  list    List all dot folder paths present in the config file
+  edit    Edit the path of an existing dot folder in the config.
+  create  Create the dotfiles directory
+  update  Update the dotfiles directory
+  info    Some important information.
+  github  Commands related to GitHub operations
 ```
 
 ## Changelog
