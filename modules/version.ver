@@ -1,0 +1,5 @@
+[Version]
+version = 1.2.0
+
+[Update]
+command = sudo curl -L -o /usr/local/bin/xdfm https://raw.githubusercontent.com/xeyossr/xDFM/refs/heads/main/dist/xdfm && sudo chmod +x /usr/local/bin/xdfm
