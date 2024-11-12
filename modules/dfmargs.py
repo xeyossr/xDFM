@@ -20,15 +20,18 @@ dot_config_dir = Path(os.path.join(home_dir, '.config'))
 config_dir = Path(os.path.join(dot_config_dir, 'xdfm'))
 config_file = Path(os.path.join(config_dir, 'xdfm.conf'))
 main = home_dir
+
 class OrderedGroup(click.Group):
     def list_commands(self, ctx):
         return list(self.commands)
 
 # Main command
 @click.group(cls=OrderedGroup)
+@click.version_option(version="1.1.0")
 def xdfm():
     """xdfm - Xeyossr Dotfiles Manager."""
     pass
+
 
 # GitHub sub-command group
 @click.group()
@@ -73,26 +76,34 @@ def pat(pat_token):
 
 # Add folder command
 @xdfm.command()
-@click.argument('key')
 @click.argument('value')
-def add(key, value):
-    """Add a new dot folder path to the config."""
+@click.argument('key', required=False, default=None)
+def add(value, key):
+    """Add a new dot folder path to the config file."""
     click.echo(f"{colorama.Fore.YELLOW}Adding folder: `{colorama.Fore.GREEN}{value}{colorama.Fore.YELLOW}`")
-    dfm.add_config(config_file, 'Dots', key, value)
+    dfm.add_config(config_file, 'Dots', value, key)
+
 
 # Remove folder command
 @xdfm.command()
 @click.argument('key')
 def remove(key):
-    """Remove an existing dot folder path from the config."""
+    """Remove an existing dot folder path from the config file."""
     click.echo(f"{colorama.Fore.YELLOW}Removing `{colorama.Fore.GREEN}{key}{colorama.Fore.YELLOW}`")
     dfm.remove_config(config_file, 'Dots', key)
 
+# List command
+@xdfm.command(name="list")
+def list_command():
+    """List all dot folder paths present in the config file"""
+    dfm.list(config_file)
+
+# Edit command
 @xdfm.command()
 @click.argument('key')
 @click.argument('value')
 def edit(key, value):
-    """Edit the path of an existing dot folder."""
+    """Edit the path of an existing dot folder in the config."""
     click.echo(f"{colorama.Fore.YELLOW}Editing `{colorama.Fore.GREEN}{key}{colorama.Fore.YELLOW}` to `{colorama.Fore.GREEN}{value}{colorama.Fore.YELLOW}`")
     dfm.edit_config(config_file, 'Dots', key, value)
 
@@ -101,17 +112,23 @@ def edit(key, value):
 @click.option('--path', default=main, help='Dotfiles folder path')
 @click.option('--name', default='dotfiles')
 def create(path, name):
-    """Create dotfiles directory"""
+    """Create the dotfiles directory"""
     click.echo(f"{colorama.Fore.GREEN}Creating dotfiles...")
     dfm.create_dotfiles(config_file, path, name)
 
 @xdfm.command()
-@click.option('--path', default=main, help='Dotfiles folder path')
-@click.option('--name', default='dotfiles')
-def recreate(path):
-    """Recreate the dotfiles directory"""
-    click.echo(f'{colorama.Fore.GREEN}Recreating dotfiles...');
-    dfm.recreate_dotfiles(config_file, path, name)
+@click.argument('path')
+def update(path):
+    """Update the dotfiles directory"""
+    dfm.update_dotfiles(config_file, path)
+
+
+@xdfm.command()
+def info():
+    """Some important information."""
+    click.echo("Some information")
+    click.echo("\n- When adding a file with 'add', if the key is not equal to the name of the file and there is no space or extension in the key, it will create a folder with that name and put the file there.")
+
 
 # Add the github commands to the main xdfm command
 xdfm.add_command(github)
