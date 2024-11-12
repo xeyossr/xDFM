@@ -61,6 +61,16 @@ Commands:
   github    Commands related to GitHub operations
 ```
 
+## Changelog
+
+All notable changes to this project will be documented in this file.
+
+See the [CHANGELOG](./CHANGELOG.md) for full version history.
+
+## License
+
+This project is licensed under the [GPL-3.0 License](https://www.gnu.org/licenses/gpl-3.0.html). For more details, please see the [LICENSE file](./LICENSE).
+
 ## Contribution
 
-Found a bug? Have a cool feature request? Feel free to open an [issue](https://github.com/xeyossr/xDFM/issues) or a [pull request](https://github.com/xeyossr/xDFM/pulls). We welcome contributions of all kinds—just no pineapple on pizza, please 🙂
+If you encounter any bugs or have suggestions for new features, we encourage you to open an [issue](https://github.com/xeyossr/xDFM/issues) or submit a [pull request](https://github.com/xeyossr/xDFM/pulls). We welcome contributions from the community and appreciate any improvements to the project. Please ensure that your contributions adhere to the project's guidelines and follow best practices.
