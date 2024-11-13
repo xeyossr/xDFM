@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Updated the `create` command to copy to folder within folder.
+- Updated the `update` command to be compatible with the `create` command and made it more aggregated
 - Removed unused modules
 
 ## [1.1.0] - 2024-11-12
